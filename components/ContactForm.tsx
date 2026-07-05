@@ -34,10 +34,7 @@ export default function ContactForm() {
   return (
     <section id="contact" className="bg-tide">
       <div className="max-w-2xl mx-auto px-5 md:px-8 py-20 md:py-28">
-        <span className="text-ochre text-sm tracking-[0.2em] uppercase font-medium">
-          Get in touch
-        </span>
-        <h2 className="font-display text-3xl md:text-4xl text-cream mt-4 mb-10">
+        <h2 className="font-display text-3xl md:text-4xl text-cream mb-10">
           Send a message
         </h2>
 
