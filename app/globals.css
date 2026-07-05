@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  --color-tide: #1f3a34;
+  --color-tide-light: #2c4f47;
+  --color-sand: #f3ead9;
+  --color-cream: #faf6ec;
+  --color-charcoal: #221f1a;
+  --color-ochre: #c17a2e;
+  --color-clay: #a85a3f;
+}
+
+@theme inline {
+  --color-tide: var(--color-tide);
+  --color-tide-light: var(--color-tide-light);
+  --color-sand: var(--color-sand);
+  --color-cream: var(--color-cream);
+  --color-charcoal: var(--color-charcoal);
+  --color-ochre: var(--color-ochre);
+  --color-clay: var(--color-clay);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-sand);
+  color: var(--color-charcoal);
+}
+
+/* Elegant editorial-serif stack for headings, warm humanist sans for body.
+   Self-hosted Google Fonts aren't reachable in this sandbox, so we lean on
+   high-quality system font stacks that approximate the intended pairing. */
+.font-display {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.font-body {
+  font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
