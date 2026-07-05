@@ -9,7 +9,6 @@ const links = [
   { href: "#gallery", label: "Gallery" },
   { href: "#reviews", label: "Reviews" },
   { href: "#visit", label: "Visit" },
-  { href: "#contact", label: "Contact" },
 ];
 
 export default function Navbar() {

@@ -6,7 +6,6 @@ import Menu from "@/components/Menu";
 import Gallery from "@/components/Gallery";
 import Reviews from "@/components/Reviews";
 import LocationHours from "@/components/LocationHours";
-import ContactForm from "@/components/ContactForm";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -24,8 +23,6 @@ export default function Home() {
         <Reviews />
         <TideDivider from="#1f3a34" to="#f3ead9" flip />
         <LocationHours />
-        <TideDivider from="#f3ead9" to="#1f3a34" />
-        <ContactForm />
       </main>
       <Footer />
     </>
