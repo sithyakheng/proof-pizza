@@ -150,7 +150,11 @@ export default function OrderPage() {
       setOrderPlaced(true);
     } catch (err: any) {
       console.error("Order error:", err);
-      setErrorMessage("Failed to submit order. Please try again or ask a staff member.");
+      setErrorMessage(
+        err?.message
+          ? `Failed to submit order: ${err.message}`
+          : "Failed to submit order. Please try again or ask a staff member."
+      );
     } finally {
       setSubmitting(false);
     }
