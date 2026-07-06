@@ -6,72 +6,19 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Plus, Minus, ShoppingBag, CheckCircle } from "lucide-react";
 
-const FALLBACK_CATEGORIES: MenuCategory[] = [
-  { id: "c1", name: "Pizza", display_order: 1 },
-  { id: "c2", name: "Sides", display_order: 2 },
-  { id: "c3", name: "Coffee & Drinks", display_order: 3 },
-];
+const FALLBACK_CATEGORIES: MenuCategory[] = [{ id: "pizza", name: "Pizza", display_order: 1 }];
 
 const FALLBACK_ITEMS: MenuItem[] = [
   {
-    id: "1",
-    category_id: "c1",
-    name: "Prosciutto & Arugula",
-    description: "San Daniele prosciutto, fresh arugula, shaved parmesan",
-    price: 8.5,
-    image_url: null,
+    id: "pizza-1",
+    category_id: "pizza",
+    name: "Italian Pizza",
+    description: "Wood-fired, fresh mozzarella, basil",
+    price: 8.0,
+    image_url:
+      "https://cfxgfthinkorqgmqmahp.supabase.co/storage/v1/object/public/menu-images/ChatGPT%20Image%20Jul%206,%202026,%2002_49_25%20PM.png",
     is_available: true,
     display_order: 1,
-  },
-  {
-    id: "2",
-    category_id: "c1",
-    name: "Margherita",
-    description: "San Marzano tomato, fior di latte, basil",
-    price: 6.5,
-    image_url: null,
-    is_available: true,
-    display_order: 2,
-  },
-  {
-    id: "3",
-    category_id: "c1",
-    name: "Kep Pepper Prawn",
-    description: "Local Kep prawns, Kampot pepper, garlic oil",
-    price: 9,
-    image_url: null,
-    is_available: true,
-    display_order: 3,
-  },
-  {
-    id: "4",
-    category_id: "c2",
-    name: "Garlic Focaccia",
-    description: "Baked to order, herb butter",
-    price: 3.5,
-    image_url: null,
-    is_available: true,
-    display_order: 1,
-  },
-  {
-    id: "5",
-    category_id: "c3",
-    name: "Iced Pour-Over",
-    description: "Rotating single origin",
-    price: 3,
-    image_url: null,
-    is_available: true,
-    display_order: 1,
-  },
-  {
-    id: "6",
-    category_id: "c3",
-    name: "Fresh Lime Soda",
-    description: "Kep lime, soda, mint",
-    price: 2.5,
-    image_url: null,
-    is_available: true,
-    display_order: 2,
   },
 ];
 
@@ -79,7 +26,7 @@ export default function OrderPage() {
   const [categories, setCategories] = useState<MenuCategory[]>(FALLBACK_CATEGORIES);
   const [items, setItems] = useState<MenuItem[]>(FALLBACK_ITEMS);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<string>("c1");
+  const [activeCategory, setActiveCategory] = useState<string>(FALLBACK_CATEGORIES[0].id);
 
   // Cart state: item_id -> quantity
   const [cart, setCart] = useState<Record<string, number>>({});
@@ -209,6 +156,8 @@ export default function OrderPage() {
     }
   };
 
+  const visibleCategories = categories.filter((cat) => items.some((item) => item.category_id === cat.id));
+  const activeTabs = visibleCategories.length > 0 ? visibleCategories : [{ id: activeCategory, name: activeCategory, display_order: 0 }];
   const visibleItems = items.filter((i) => i.category_id === activeCategory);
 
   return (
@@ -254,7 +203,7 @@ export default function OrderPage() {
                 <div className="lg:col-span-7 bg-cream border border-tide/5 rounded-3xl p-6 md:p-8 shadow-sm">
                   {/* Category Tabs */}
                   <div className="flex flex-wrap gap-2 mb-8 border-b border-charcoal/5 pb-6">
-                    {categories.map((cat) => (
+                    {activeTabs.map((cat) => (
                       <button
                         key={cat.id}
                         onClick={() => setActiveCategory(cat.id)}
@@ -278,26 +227,42 @@ export default function OrderPage() {
                         return (
                           <div
                             key={item.id}
-                            className="flex items-start justify-between gap-4 border-b border-charcoal/5 pb-6 last:border-0 last:pb-0"
+                            className="flex flex-col md:flex-row items-start justify-between gap-4 border-b border-charcoal/5 pb-6 last:border-0 last:pb-0"
                           >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-display text-lg text-tide font-semibold">
-                                  {item.name}
-                                </h3>
-                                {!item.is_available && (
-                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-clay border border-clay/35 rounded-full px-2 py-0.5">
-                                    Sold out
-                                  </span>
+                            <div className="flex items-start gap-4 w-full md:w-auto">
+                              <div className="w-full md:w-32 h-32 rounded-3xl overflow-hidden bg-sand/80 flex items-center justify-center shrink-0">
+                                {item.image_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={item.image_url}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="text-charcoal/30 text-xs font-semibold text-center px-3">
+                                    No photo available
+                                  </div>
                                 )}
                               </div>
-                              {item.description && (
-                                <p className="text-charcoal/60 text-xs md:text-sm mt-1 leading-relaxed">
-                                  {item.description}
-                                </p>
-                              )}
-                              <div className="text-ochre font-medium text-sm md:text-base mt-2">
-                                ${item.price.toFixed(2)}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h3 className="font-display text-lg text-tide font-semibold">
+                                    {item.name}
+                                  </h3>
+                                  {!item.is_available && (
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-clay border border-clay/35 rounded-full px-2 py-0.5">
+                                      Sold out
+                                    </span>
+                                  )}
+                                </div>
+                                {item.description && (
+                                  <p className="text-charcoal/60 text-xs md:text-sm mt-1 leading-relaxed">
+                                    {item.description}
+                                  </p>
+                                )}
+                                <div className="text-ochre font-medium text-sm md:text-base mt-3">
+                                  ${item.price.toFixed(2)}
+                                </div>
                               </div>
                             </div>
 
