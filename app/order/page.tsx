@@ -1,0 +1,456 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase, MenuCategory, MenuItem } from "@/lib/supabase";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
+import { Plus, Minus, ShoppingBag, CheckCircle } from "lucide-react";
+
+const FALLBACK_CATEGORIES: MenuCategory[] = [
+  { id: "c1", name: "Pizza", display_order: 1 },
+  { id: "c2", name: "Sides", display_order: 2 },
+  { id: "c3", name: "Coffee & Drinks", display_order: 3 },
+];
+
+const FALLBACK_ITEMS: MenuItem[] = [
+  {
+    id: "1",
+    category_id: "c1",
+    name: "Prosciutto & Arugula",
+    description: "San Daniele prosciutto, fresh arugula, shaved parmesan",
+    price: 8.5,
+    image_url: null,
+    is_available: true,
+    display_order: 1,
+  },
+  {
+    id: "2",
+    category_id: "c1",
+    name: "Margherita",
+    description: "San Marzano tomato, fior di latte, basil",
+    price: 6.5,
+    image_url: null,
+    is_available: true,
+    display_order: 2,
+  },
+  {
+    id: "3",
+    category_id: "c1",
+    name: "Kep Pepper Prawn",
+    description: "Local Kep prawns, Kampot pepper, garlic oil",
+    price: 9,
+    image_url: null,
+    is_available: true,
+    display_order: 3,
+  },
+  {
+    id: "4",
+    category_id: "c2",
+    name: "Garlic Focaccia",
+    description: "Baked to order, herb butter",
+    price: 3.5,
+    image_url: null,
+    is_available: true,
+    display_order: 1,
+  },
+  {
+    id: "5",
+    category_id: "c3",
+    name: "Iced Pour-Over",
+    description: "Rotating single origin",
+    price: 3,
+    image_url: null,
+    is_available: true,
+    display_order: 1,
+  },
+  {
+    id: "6",
+    category_id: "c3",
+    name: "Fresh Lime Soda",
+    description: "Kep lime, soda, mint",
+    price: 2.5,
+    image_url: null,
+    is_available: true,
+    display_order: 2,
+  },
+];
+
+export default function OrderPage() {
+  const [categories, setCategories] = useState<MenuCategory[]>(FALLBACK_CATEGORIES);
+  const [items, setItems] = useState<MenuItem[]>(FALLBACK_ITEMS);
+  const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string>("c1");
+
+  // Cart state: item_id -> quantity
+  const [cart, setCart] = useState<Record<string, number>>({});
+  
+  // Checkout details
+  const [customerName, setCustomerName] = useState("");
+  const [tableNumber, setTableNumber] = useState("");
+  
+  // Order status
+  const [submitting, setSubmitting] = useState(false);
+  const [orderPlaced, setOrderPlaced] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data: cats, error: catErr } = await supabase
+          .from("menu_categories")
+          .select("*")
+          .order("display_order");
+
+        const { data: menuItems, error: itemErr } = await supabase
+          .from("menu_items")
+          .select("*")
+          .order("display_order");
+
+        if (!catErr && cats && cats.length > 0) {
+          setCategories(cats as MenuCategory[]);
+          setActiveCategory((cats[0] as MenuCategory).id);
+        }
+        if (!itemErr && menuItems && menuItems.length > 0) {
+          setItems(menuItems as MenuItem[]);
+        }
+      } catch {
+        // Fallback to offline data
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const updateQuantity = (itemId: string, delta: number) => {
+    setCart((prev) => {
+      const current = prev[itemId] || 0;
+      const next = Math.max(0, current + delta);
+      if (next === 0) {
+        const updated = { ...prev };
+        delete updated[itemId];
+        return updated;
+      }
+      return { ...prev, [itemId]: next };
+    });
+  };
+
+  const getCartItemsList = () => {
+    return Object.entries(cart)
+      .map(([id, qty]) => {
+        const item = items.find((i) => i.id === id);
+        return item ? { item, qty } : null;
+      })
+      .filter((entry): entry is { item: MenuItem; qty: number } => entry !== null);
+  };
+
+  const cartItems = getCartItemsList();
+  const totalAmount = cartItems.reduce((sum, entry) => sum + entry.item.price * entry.qty, 0);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cartItems.length === 0) {
+      setErrorMessage("Please select at least one item to order.");
+      return;
+    }
+    if (!customerName.trim() || !tableNumber.trim()) {
+      setErrorMessage("Please fill in both Customer Name and Table Number.");
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      // 1. Insert order
+      const { data: orderData, error: orderErr } = await supabase
+        .from("orders")
+        .insert({
+          customer_name: customerName.trim(),
+          table_number: tableNumber.trim(),
+          total_amount: totalAmount,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (orderErr) throw orderErr;
+
+      const orderId = orderData.id;
+
+      // 2. Insert order items
+      const isUUID = (str: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+      const itemsToInsert = cartItems.map((entry) => ({
+        order_id: orderId,
+        menu_item_id: isUUID(entry.item.id) ? entry.item.id : null,
+        item_name: entry.item.name,
+        price: entry.item.price,
+        quantity: entry.qty,
+      }));
+
+      const { error: itemsErr } = await supabase
+        .from("order_items")
+        .insert(itemsToInsert);
+
+      if (itemsErr) throw itemsErr;
+
+      // Reset and complete
+      setCart({});
+      setCustomerName("");
+      setTableNumber("");
+      setOrderPlaced(true);
+    } catch (err: any) {
+      console.error("Order error:", err);
+      setErrorMessage("Failed to submit order. Please try again or ask a staff member.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const visibleItems = items.filter((i) => i.category_id === activeCategory);
+
+  return (
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-sand pt-28 pb-16">
+        <div className="max-w-6xl mx-auto px-5 md:px-8">
+          {orderPlaced ? (
+            <div className="max-w-xl mx-auto mt-12 bg-cream border border-tide/10 rounded-3xl p-8 md:p-12 text-center shadow-lg">
+              <div className="flex justify-center mb-6">
+                <CheckCircle className="text-ochre w-16 h-16" />
+              </div>
+              <h2 className="font-display text-3xl text-tide mb-4 font-semibold">Order Received!</h2>
+              <p className="text-charcoal/70 mb-8 leading-relaxed">
+                Thank you! The kitchen has received your order and we'll start preparing it right away.
+              </p>
+              <button
+                onClick={() => setOrderPlaced(false)}
+                className="bg-tide text-cream px-8 py-3 rounded-full font-medium tracking-wide hover:bg-tide-light transition-colors"
+              >
+                Order Something Else
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Header */}
+              <div className="mb-10 text-center md:text-left">
+                <span className="text-ochre text-sm tracking-[0.2em] uppercase font-medium">
+                  Fresh from our wood-fired oven
+                </span>
+                <h1 className="font-display text-4xl md:text-5xl text-tide mt-3">
+                  Place Your Order
+                </h1>
+                <p className="text-charcoal/60 mt-2 text-sm md:text-base">
+                  Select your items, enter details, and we'll bring them straight to your table.
+                </p>
+              </div>
+
+              {/* Grid Layout */}
+              <div className="grid lg:grid-cols-12 gap-8 items-start">
+                
+                {/* Left side: Menu items */}
+                <div className="lg:col-span-7 bg-cream border border-tide/5 rounded-3xl p-6 md:p-8 shadow-sm">
+                  {/* Category Tabs */}
+                  <div className="flex flex-wrap gap-2 mb-8 border-b border-charcoal/5 pb-6">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setActiveCategory(cat.id)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium tracking-wide transition-colors ${
+                          activeCategory === cat.id
+                            ? "bg-ochre text-cream"
+                            : "bg-charcoal/5 text-charcoal/75 hover:bg-charcoal/10"
+                        }`}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {loading ? (
+                    <div className="text-charcoal/50 text-sm py-12 text-center">Loading fresh menu…</div>
+                  ) : (
+                    <div className="space-y-6">
+                      {visibleItems.map((item) => {
+                        const qty = cart[item.id] || 0;
+                        return (
+                          <div
+                            key={item.id}
+                            className="flex items-start justify-between gap-4 border-b border-charcoal/5 pb-6 last:border-0 last:pb-0"
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-display text-lg text-tide font-semibold">
+                                  {item.name}
+                                </h3>
+                                {!item.is_available && (
+                                  <span className="text-[10px] font-semibold uppercase tracking-wider text-clay border border-clay/35 rounded-full px-2 py-0.5">
+                                    Sold out
+                                  </span>
+                                )}
+                              </div>
+                              {item.description && (
+                                <p className="text-charcoal/60 text-xs md:text-sm mt-1 leading-relaxed">
+                                  {item.description}
+                                </p>
+                              )}
+                              <div className="text-ochre font-medium text-sm md:text-base mt-2">
+                                ${item.price.toFixed(2)}
+                              </div>
+                            </div>
+
+                            {/* Quantity Controls */}
+                            <div className="flex items-center gap-3">
+                              {item.is_available ? (
+                                qty > 0 ? (
+                                  <div className="flex items-center bg-sand border border-charcoal/10 rounded-full p-1 gap-2.5">
+                                    <button
+                                      onClick={() => updateQuantity(item.id, -1)}
+                                      className="p-1 rounded-full text-tide hover:bg-charcoal/5 transition-colors"
+                                      aria-label="Decrease quantity"
+                                    >
+                                      <Minus size={16} />
+                                    </button>
+                                    <span className="font-semibold text-tide text-sm w-4 text-center">
+                                      {qty}
+                                    </span>
+                                    <button
+                                      onClick={() => updateQuantity(item.id, 1)}
+                                      className="p-1 rounded-full text-tide hover:bg-charcoal/5 transition-colors"
+                                      aria-label="Increase quantity"
+                                    >
+                                      <Plus size={16} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => updateQuantity(item.id, 1)}
+                                    className="bg-tide text-cream text-xs font-semibold px-4 py-2 rounded-full hover:bg-tide-light transition-colors flex items-center gap-1 shadow-sm"
+                                  >
+                                    <Plus size={14} /> Add
+                                  </button>
+                                )
+                              ) : (
+                                <span className="text-xs text-charcoal/30 font-medium">Unavailable</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {visibleItems.length === 0 && (
+                        <p className="text-charcoal/40 text-center py-8">No items in this category.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right side: Basket & Checkout */}
+                <div className="lg:col-span-5 lg:sticky lg:top-28">
+                  <div className="bg-cream border border-tide/5 rounded-3xl p-6 md:p-8 shadow-sm">
+                    <h2 className="font-display text-2xl text-tide border-b border-charcoal/5 pb-4 mb-5 flex items-center gap-2">
+                      <ShoppingBag size={20} className="text-ochre" /> Your Order
+                    </h2>
+
+                    {cartItems.length === 0 ? (
+                      <div className="text-center py-8 text-charcoal/40 text-sm">
+                        Your tray is empty. Add items from the menu.
+                      </div>
+                    ) : (
+                      <>
+                        {/* Cart items list */}
+                        <div className="space-y-4 max-h-[220px] overflow-y-auto mb-6 pr-1">
+                          {cartItems.map(({ item, qty }) => (
+                            <div key={item.id} className="flex justify-between items-center text-sm">
+                              <div className="flex-1 min-w-0 pr-2">
+                                <span className="font-semibold text-tide">{qty}x</span>{" "}
+                                <span className="text-charcoal/80 truncate inline-block max-w-[80%] align-bottom">
+                                  {item.name}
+                                </span>
+                              </div>
+                              <div className="font-medium text-charcoal pr-3">
+                                ${(item.price * qty).toFixed(2)}
+                              </div>
+                              <button
+                                onClick={() => updateQuantity(item.id, -qty)}
+                                className="text-xs text-clay hover:underline"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Order Summary Total */}
+                        <div className="border-t border-charcoal/5 pt-4 mb-6 flex justify-between items-center">
+                          <span className="font-medium text-charcoal">Total Amount</span>
+                          <span className="font-display text-2xl text-ochre font-bold">
+                            ${totalAmount.toFixed(2)}
+                          </span>
+                        </div>
+
+                        {/* Checkout Form */}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                          <div>
+                            <label htmlFor="customerName" className="block text-xs font-semibold text-charcoal/70 uppercase tracking-wider mb-1.5">
+                              Name
+                            </label>
+                            <input
+                              type="text"
+                              id="customerName"
+                              required
+                              value={customerName}
+                              onChange={(e) => setCustomerName(e.target.value)}
+                              placeholder="e.g. Liam"
+                              className="w-full bg-sand/40 border border-charcoal/10 rounded-xl px-4 py-2.5 text-sm text-charcoal focus:outline-none focus:border-ochre focus:ring-1 focus:ring-ochre"
+                            />
+                          </div>
+
+                          <div>
+                            <label htmlFor="tableNumber" className="block text-xs font-semibold text-charcoal/70 uppercase tracking-wider mb-1.5">
+                              Table Number
+                            </label>
+                            <input
+                              type="text"
+                              id="tableNumber"
+                              required
+                              value={tableNumber}
+                              onChange={(e) => setTableNumber(e.target.value)}
+                              placeholder="e.g. Table 4"
+                              className="w-full bg-sand/40 border border-charcoal/10 rounded-xl px-4 py-2.5 text-sm text-charcoal focus:outline-none focus:border-ochre focus:ring-1 focus:ring-ochre"
+                            />
+                          </div>
+
+                          {errorMessage && (
+                            <div className="text-xs text-clay bg-clay/10 p-3 rounded-lg border border-clay/20 font-medium">
+                              {errorMessage}
+                            </div>
+                          )}
+
+                          <button
+                            type="submit"
+                            disabled={submitting}
+                            className={`w-full text-center py-3.5 rounded-full font-medium tracking-wide text-cream transition-colors text-sm shadow-sm ${
+                              submitting
+                                ? "bg-tide/50 cursor-not-allowed"
+                                : "bg-ochre hover:bg-ochre/90"
+                            }`}
+                          >
+                            {submitting ? "Sending to Kitchen..." : "Confirm & Send to Kitchen"}
+                          </button>
+                        </form>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}

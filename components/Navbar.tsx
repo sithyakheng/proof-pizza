@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 
 const links = [
-  { href: "#about", label: "About" },
-  { href: "#menu", label: "Menu" },
-  { href: "#gallery", label: "Gallery" },
-  { href: "#reviews", label: "Reviews" },
-  { href: "#visit", label: "Visit" },
+  { href: "/#about", label: "About" },
+  { href: "/#menu", label: "Menu" },
+  { href: "/#gallery", label: "Gallery" },
+  { href: "/#reviews", label: "Reviews" },
+  { href: "/#visit", label: "Visit" },
 ];
 
 export default function Navbar() {
@@ -28,7 +28,7 @@ export default function Navbar() {
       }`}
     >
       <nav className="max-w-6xl mx-auto flex items-center justify-between px-5 md:px-8 py-4">
-        <a href="#top" className="font-display italic text-xl md:text-2xl text-cream tracking-wide">
+        <a href="/" className="font-display italic text-xl md:text-2xl text-cream tracking-wide">
           Proof
         </a>
 
@@ -42,6 +42,12 @@ export default function Navbar() {
               {l.label}
             </a>
           ))}
+          <a
+            href="/order"
+            className="bg-ochre text-cream px-5 py-2.5 rounded-full font-medium text-sm tracking-wide hover:bg-ochre/90 transition-colors"
+          >
+            Order Now
+          </a>
         </div>
 
         <button
@@ -65,6 +71,13 @@ export default function Navbar() {
               {l.label}
             </a>
           ))}
+          <a
+            href="/order"
+            onClick={() => setOpen(false)}
+            className="bg-ochre text-cream px-5 py-2.5 rounded-full font-medium text-sm tracking-wide text-center hover:bg-ochre/90 transition-colors"
+          >
+            Order Now
+          </a>
         </div>
       )}
     </header>

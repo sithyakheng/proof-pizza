@@ -32,3 +32,21 @@ export type GalleryItem = {
   caption: string | null;
   display_order: number;
 };
+
+export type Order = {
+  id: string;
+  customer_name: string;
+  table_number: string;
+  status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
+  total_amount: number;
+  created_at: string;
+};
+
+export type OrderItem = {
+  id: string;
+  order_id: string;
+  menu_item_id: string | null;
+  item_name: string;
+  price: number;
+  quantity: number;
+};
