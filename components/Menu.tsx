@@ -4,72 +4,19 @@ import { useEffect, useState } from "react";
 import { supabase, MenuCategory, MenuItem } from "@/lib/supabase";
 import { Pizza } from "lucide-react";
 
-const FALLBACK_CATEGORIES: MenuCategory[] = [
-  { id: "c1", name: "Pizza", display_order: 1 },
-  { id: "c2", name: "Sides", display_order: 2 },
-  { id: "c3", name: "Coffee & Drinks", display_order: 3 },
-];
+const FALLBACK_CATEGORIES: MenuCategory[] = [{ id: "pizza", name: "Pizza", display_order: 1 }];
 
 const FALLBACK_ITEMS: MenuItem[] = [
   {
-    id: "1",
-    category_id: "c1",
-    name: "Prosciutto & Arugula",
-    description: "San Daniele prosciutto, fresh arugula, shaved parmesan",
-    price: 8.5,
-    image_url: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&auto=format&fit=crop&q=60",
+    id: "pizza-1",
+    category_id: "pizza",
+    name: "Italian Pizza",
+    description: "Wood-fired, fresh mozzarella, basil",
+    price: 8.0,
+    image_url:
+      "https://cfxgfthinkorqgmqmahp.supabase.co/storage/v1/object/public/menu-images/ChatGPT%20Image%20Jul%206,%202026,%2002_49_25%20PM.png",
     is_available: true,
     display_order: 1,
-  },
-  {
-    id: "2",
-    category_id: "c1",
-    name: "Margherita",
-    description: "San Marzano tomato, fior di latte, basil",
-    price: 6.5,
-    image_url: "https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?w=600&auto=format&fit=crop&q=60",
-    is_available: true,
-    display_order: 2,
-  },
-  {
-    id: "3",
-    category_id: "c1",
-    name: "Kep Pepper Prawn",
-    description: "Local Kep prawns, Kampot pepper, garlic oil",
-    price: 9,
-    image_url: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop&q=60",
-    is_available: true,
-    display_order: 3,
-  },
-  {
-    id: "4",
-    category_id: "c2",
-    name: "Garlic Focaccia",
-    description: "Baked to order, herb butter",
-    price: 3.5,
-    image_url: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=60",
-    is_available: true,
-    display_order: 1,
-  },
-  {
-    id: "5",
-    category_id: "c3",
-    name: "Iced Pour-Over",
-    description: "Rotating single origin",
-    price: 3,
-    image_url: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600&auto=format&fit=crop&q=60",
-    is_available: true,
-    display_order: 1,
-  },
-  {
-    id: "6",
-    category_id: "c3",
-    name: "Fresh Lime Soda",
-    description: "Kep lime, soda, mint",
-    price: 2.5,
-    image_url: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=60",
-    is_available: true,
-    display_order: 2,
   },
 ];
 
@@ -77,30 +24,56 @@ export default function Menu() {
   const [categories, setCategories] = useState<MenuCategory[]>(FALLBACK_CATEGORIES);
   const [items, setItems] = useState<MenuItem[]>(FALLBACK_ITEMS);
   const [loading, setLoading] = useState(true);
-  const [activeCategory, setActiveCategory] = useState<string>("c1");
+  const [activeCategory, setActiveCategory] = useState<string>(FALLBACK_CATEGORIES[0].id);
 
   useEffect(() => {
     async function load() {
       try {
-        const { data: cats, error: catErr } = await supabase
-          .from("menu_categories")
-          .select("*")
-          .order("display_order");
-
         const { data: menuItems, error: itemErr } = await supabase
           .from("menu_items")
           .select("*")
           .order("display_order");
 
-        if (!catErr && cats && cats.length > 0) {
-          setCategories(cats as MenuCategory[]);
-          setActiveCategory((cats[0] as MenuCategory).id);
-        }
-        if (!itemErr && menuItems && menuItems.length > 0) {
-          setItems(menuItems as MenuItem[]);
+        const { data: cats, error: catErr } = await supabase
+          .from("menu_categories")
+          .select("*")
+          .order("display_order");
+
+        const loadedItems = !itemErr && menuItems && menuItems.length > 0 ? (menuItems as MenuItem[]) : [];
+        const loadedCategories = !catErr && cats && cats.length > 0 ? (cats as MenuCategory[]) : [];
+
+        if (loadedItems.length > 0) {
+          setItems(loadedItems);
+
+          if (loadedCategories.length > 0) {
+            const categoriesWithItems = loadedCategories.filter((cat) =>
+              loadedItems.some((item) => item.category_id === cat.id)
+            );
+
+            if (categoriesWithItems.length > 0) {
+              setCategories(categoriesWithItems);
+              setActiveCategory(categoriesWithItems[0].id);
+            } else {
+              const derivedCategories = Array.from(
+                new Map(
+                  loadedItems.map((item) => [item.category_id, { id: item.category_id, name: item.category_id, display_order: 0 }])
+                ).values()
+              );
+              setCategories(derivedCategories);
+              setActiveCategory(derivedCategories[0].id);
+            }
+          } else {
+            const derivedCategories = Array.from(
+              new Map(
+                loadedItems.map((item) => [item.category_id, { id: item.category_id, name: item.category_id, display_order: 0 }])
+              ).values()
+            );
+            setCategories(derivedCategories);
+            setActiveCategory(derivedCategories[0].id);
+          }
         }
       } catch {
-        // Supabase not configured yet — fallback data already in state
+        // Supabase not configured yet — fallback data remains in state.
       } finally {
         setLoading(false);
       }
@@ -109,6 +82,8 @@ export default function Menu() {
   }, []);
 
   const visibleItems = items.filter((i) => i.category_id === activeCategory);
+  const categoryTabs = categories.filter((cat) => items.some((item) => item.category_id === cat.id));
+  const visibleTabs = categoryTabs.length > 0 ? categoryTabs : [{ id: activeCategory, name: activeCategory, display_order: 0 }];
 
   return (
     <section id="menu" className="bg-tide">
@@ -124,7 +99,7 @@ export default function Menu() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
+            {visibleTabs.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
@@ -179,14 +154,26 @@ export default function Menu() {
                         </span>
                       )}
                     </div>
-                    {item.description && (
+                    {item.description ? (
                       <p className="text-cream/55 text-sm mt-1.5 leading-relaxed">
                         {item.description}
                       </p>
+                    ) : (
+                      <p className="text-cream/55 text-sm mt-1.5 leading-relaxed">
+                        Wood-fired, fresh mozzarella, basil
+                      </p>
                     )}
                   </div>
-                  <div className="font-display text-ochre text-lg mt-3 sm:mt-0">
-                    ${item.price.toFixed(2)}
+                  <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="font-display text-ochre text-lg">
+                      ${item.price.toFixed(2)}
+                    </div>
+                    <a
+                      href="/order"
+                      className="inline-flex items-center justify-center rounded-full bg-ochre px-5 py-3 text-sm font-semibold text-cream hover:bg-ochre/90 transition-colors"
+                    >
+                      Order
+                    </a>
                   </div>
                 </div>
               </div>
