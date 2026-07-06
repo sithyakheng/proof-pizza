@@ -384,7 +384,7 @@ export default function OrderPage() {
                 <div className="lg:col-span-5 lg:sticky lg:top-28">
                   <div className="bg-cream border border-tide/5 rounded-3xl p-5 md:p-6 lg:p-8 shadow-sm">
                     <h2 className="font-display text-xl md:text-2xl text-tide border-b border-charcoal/5 pb-3 md:pb-4 mb-4 md:mb-5 flex items-center gap-2">
-                      <ShoppingBag size={18} md:size={20} className="text-ochre" /> Your Order
+                      <ShoppingBag className="w-[18px] h-[18px] md:w-5 md:h-5 text-ochre" /> Your Order
                     </h2>
 
                     {cartItems.length === 0 ? (
