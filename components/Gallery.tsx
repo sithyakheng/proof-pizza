@@ -4,8 +4,18 @@ import { useEffect, useState } from "react";
 import { supabase, GalleryItem } from "@/lib/supabase";
 import { X } from "lucide-react";
 
+const STATIC_ITEMS: GalleryItem[] = [
+  {
+    id: "static-1",
+    media_url: "https://cfxgfthinkorqgmqmahp.supabase.co/storage/v1/object/public/menu-images/ChatGPT%20Image%20Jul%206,%202026,%2002_49_25%20PM.png",
+    media_type: "image",
+    caption: null,
+    display_order: 0,
+  },
+];
+
 export default function Gallery() {
-  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [items, setItems] = useState<GalleryItem[]>(STATIC_ITEMS);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<GalleryItem | null>(null);
 
@@ -16,7 +26,9 @@ export default function Gallery() {
           .from("gallery")
           .select("*")
           .order("display_order");
-        if (!error && data) setItems(data as GalleryItem[]);
+        if (!error && data) {
+          setItems([...STATIC_ITEMS, ...(data as GalleryItem[])]);
+        }
       } catch {
         // no supabase connection yet
       } finally {
