@@ -126,9 +126,11 @@ export default function OrderPage() {
         .select()
         .single();
 
+      console.log("[order] insert orders result:", { orderData, orderErr });
       if (orderErr) throw orderErr;
 
       const orderId = orderData.id;
+      console.log("[order] created order id:", orderId);
 
       // 2. Insert order items
       const isUUID = (str: string) =>
@@ -146,6 +148,7 @@ export default function OrderPage() {
         .from("order_items")
         .insert(itemsToInsert);
 
+      console.log("[order] insert order_items result:", { itemsErr, itemsToInsertCount: itemsToInsert.length });
       if (itemsErr) throw itemsErr;
 
       setCart({});

@@ -63,6 +63,7 @@ export default function BackstageOrdersPage() {
         `)
         .order("created_at", { ascending: false });
 
+      console.log("[backstage] orders query raw result:", { data, error });
       if (error) throw error;
       setOrders((data as any) || []);
     } catch (err) {
