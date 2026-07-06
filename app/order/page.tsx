@@ -253,30 +253,30 @@ export default function OrderPage() {
       <main className="min-h-screen bg-sand pt-28 pb-16">
         <div className="max-w-6xl mx-auto px-5 md:px-8">
               {/* Header */}
-              <div className="mb-10 text-center md:text-left">
-                <span className="text-ochre text-sm tracking-[0.2em] uppercase font-medium">
+              <div className="mb-8 text-center md:text-left">
+                <span className="text-ochre text-xs md:text-sm tracking-[0.2em] uppercase font-medium">
                   Fresh from our wood-fired oven
                 </span>
-                <h1 className="font-display text-4xl md:text-5xl text-tide mt-3">
+                <h1 className="font-display text-2xl md:text-3xl lg:text-5xl text-tide mt-2 md:mt-3">
                   Place Your Order
                 </h1>
-                <p className="text-charcoal/60 mt-2 text-sm md:text-base">
+                <p className="text-charcoal/60 mt-2 text-xs md:text-sm">
                   Select your items, enter details, and we'll bring them straight to your table.
                 </p>
               </div>
 
               {/* Grid Layout */}
-              <div className="grid lg:grid-cols-12 gap-8 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
                 
                 {/* Left side: Menu items */}
-                <div className="lg:col-span-7 bg-cream border border-tide/5 rounded-3xl p-6 md:p-8 shadow-sm">
+                <div className="lg:col-span-7 bg-cream border border-tide/5 rounded-3xl p-5 md:p-6 lg:p-8 shadow-sm">
                   {/* Category Tabs */}
-                  <div className="flex flex-wrap gap-2 mb-8 border-b border-charcoal/5 pb-6">
+                  <div className="flex gap-2 mb-6 border-b border-charcoal/5 pb-4 overflow-x-auto scrollbar-hide -mx-5 px-5 md:mx-0 md:px-0">
                     {activeTabs.map((cat) => (
                       <button
                         key={cat.id}
                         onClick={() => setActiveCategory(cat.id)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium tracking-wide transition-colors ${
+                        className={`px-4 py-2.5 rounded-full text-xs md:text-sm font-medium tracking-wide transition-colors whitespace-nowrap ${
                           activeCategory === cat.id
                             ? "bg-ochre text-cream"
                             : "bg-charcoal/5 text-charcoal/75 hover:bg-charcoal/10"
@@ -290,16 +290,16 @@ export default function OrderPage() {
                   {loading ? (
                     <div className="text-charcoal/50 text-sm py-12 text-center">Loading fresh menu…</div>
                   ) : (
-                    <div className="space-y-6">
+                    <div className="space-y-5 md:space-y-6">
                       {visibleItems.map((item) => {
                         const qty = cart[item.id] || 0;
                         return (
                           <div
                             key={item.id}
-                            className="flex flex-col md:flex-row items-start justify-between gap-4 border-b border-charcoal/5 pb-6 last:border-0 last:pb-0"
+                            className="flex flex-col md:flex-row items-start justify-between gap-4 md:gap-6 border-b border-charcoal/5 pb-5 md:pb-6 last:border-0 last:pb-0"
                           >
                             <div className="flex items-start gap-4 w-full md:w-auto">
-                              <div className="w-full md:w-32 h-32 rounded-3xl overflow-hidden bg-sand/80 flex items-center justify-center shrink-0">
+                              <div className="w-full md:w-32 h-28 md:h-32 rounded-2xl md:rounded-3xl overflow-hidden bg-sand/80 flex items-center justify-center shrink-0">
                                 {item.image_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -315,7 +315,7 @@ export default function OrderPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <h3 className="font-display text-lg text-tide font-semibold">
+                                  <h3 className="font-display text-base md:text-lg text-tide font-semibold">
                                     {item.name}
                                   </h3>
                                   {!item.is_available && (
@@ -325,45 +325,45 @@ export default function OrderPage() {
                                   )}
                                 </div>
                                 {item.description && (
-                                  <p className="text-charcoal/60 text-xs md:text-sm mt-1 leading-relaxed">
+                                  <p className="text-charcoal/60 text-xs md:text-sm mt-1.5 md:mt-2 leading-relaxed">
                                     {item.description}
                                   </p>
                                 )}
-                                <div className="text-ochre font-medium text-sm md:text-base mt-3">
+                                <div className="text-ochre font-medium text-sm md:text-base mt-2.5 md:mt-3">
                                   ${item.price.toFixed(2)}
                                 </div>
                               </div>
                             </div>
 
                             {/* Quantity Controls */}
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3 w-full md:w-auto justify-end">
                               {item.is_available ? (
                                 qty > 0 ? (
                                   <div className="flex items-center bg-sand border border-charcoal/10 rounded-full p-1 gap-2.5">
                                     <button
                                       onClick={() => updateQuantity(item.id, -1)}
-                                      className="p-1 rounded-full text-tide hover:bg-charcoal/5 transition-colors"
+                                      className="p-2 rounded-full text-tide hover:bg-charcoal/5 transition-colors"
                                       aria-label="Decrease quantity"
                                     >
-                                      <Minus size={16} />
+                                      <Minus size={18} />
                                     </button>
                                     <span className="font-semibold text-tide text-sm w-4 text-center">
                                       {qty}
                                     </span>
                                     <button
                                       onClick={() => updateQuantity(item.id, 1)}
-                                      className="p-1 rounded-full text-tide hover:bg-charcoal/5 transition-colors"
+                                      className="p-2 rounded-full text-tide hover:bg-charcoal/5 transition-colors"
                                       aria-label="Increase quantity"
                                     >
-                                      <Plus size={16} />
+                                      <Plus size={18} />
                                     </button>
                                   </div>
                                 ) : (
                                   <button
                                     onClick={() => updateQuantity(item.id, 1)}
-                                    className="bg-tide text-cream text-xs font-semibold px-4 py-2 rounded-full hover:bg-tide-light transition-colors flex items-center gap-1 shadow-sm"
+                                    className="bg-tide text-cream text-xs md:text-sm font-semibold px-5 py-2.5 md:py-2 rounded-full hover:bg-tide-light transition-colors flex items-center gap-1.5 shadow-sm"
                                   >
-                                    <Plus size={14} /> Add
+                                    <Plus size={16} /> Add
                                   </button>
                                 )
                               ) : (
@@ -382,28 +382,28 @@ export default function OrderPage() {
 
                 {/* Right side: Basket & Checkout */}
                 <div className="lg:col-span-5 lg:sticky lg:top-28">
-                  <div className="bg-cream border border-tide/5 rounded-3xl p-6 md:p-8 shadow-sm">
-                    <h2 className="font-display text-2xl text-tide border-b border-charcoal/5 pb-4 mb-5 flex items-center gap-2">
-                      <ShoppingBag size={20} className="text-ochre" /> Your Order
+                  <div className="bg-cream border border-tide/5 rounded-3xl p-5 md:p-6 lg:p-8 shadow-sm">
+                    <h2 className="font-display text-xl md:text-2xl text-tide border-b border-charcoal/5 pb-3 md:pb-4 mb-4 md:mb-5 flex items-center gap-2">
+                      <ShoppingBag size={18} md:size={20} className="text-ochre" /> Your Order
                     </h2>
 
                     {cartItems.length === 0 ? (
-                      <div className="text-center py-8 text-charcoal/40 text-sm">
+                      <div className="text-center py-6 md:py-8 text-charcoal/40 text-xs md:text-sm">
                         Your tray is empty. Add items from the menu.
                       </div>
                     ) : (
                       <>
                         {/* Cart items list */}
-                        <div className="space-y-4 max-h-[220px] overflow-y-auto mb-6 pr-1">
+                        <div className="space-y-3 md:space-y-4 max-h-[200px] md:max-h-[220px] overflow-y-auto mb-4 md:mb-6 pr-1">
                           {cartItems.map(({ item, qty }) => (
-                            <div key={item.id} className="flex justify-between items-center text-sm">
+                            <div key={item.id} className="flex justify-between items-center text-xs md:text-sm">
                               <div className="flex-1 min-w-0 pr-2">
                                 <span className="font-semibold text-tide">{qty}x</span>{" "}
-                                <span className="text-charcoal/80 truncate inline-block max-w-[80%] align-bottom">
+                                <span className="text-charcoal/80 truncate inline-block max-w-[70%] md:max-w-[80%] align-bottom">
                                   {item.name}
                                 </span>
                               </div>
-                              <div className="font-medium text-charcoal pr-3">
+                              <div className="font-medium text-charcoal pr-2 md:pr-3">
                                 ${(item.price * qty).toFixed(2)}
                               </div>
                               <button
@@ -417,15 +417,15 @@ export default function OrderPage() {
                         </div>
 
                         {/* Order Summary Total */}
-                        <div className="border-t border-charcoal/5 pt-4 mb-6 flex justify-between items-center">
-                          <span className="font-medium text-charcoal">Total Amount</span>
-                          <span className="font-display text-2xl text-ochre font-bold">
+                        <div className="border-t border-charcoal/5 pt-3 md:pt-4 mb-4 md:mb-6 flex justify-between items-center">
+                          <span className="font-medium text-charcoal text-sm md:text-base">Total Amount</span>
+                          <span className="font-display text-xl md:text-2xl text-ochre font-bold">
                             ${totalAmount.toFixed(2)}
                           </span>
                         </div>
 
                         {/* Checkout Form */}
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
                           <div>
                             <label htmlFor="customerName" className="block text-xs font-semibold text-charcoal/70 uppercase tracking-wider mb-1.5">
                               Name
@@ -437,7 +437,7 @@ export default function OrderPage() {
                               value={customerName}
                               onChange={(e) => setCustomerName(e.target.value)}
                               placeholder="e.g. Liam"
-                              className="w-full bg-sand/40 border border-charcoal/10 rounded-xl px-4 py-2.5 text-sm text-charcoal focus:outline-none focus:border-ochre focus:ring-1 focus:ring-ochre"
+                              className="w-full bg-sand/40 border border-charcoal/10 rounded-xl px-4 py-3 text-sm text-charcoal focus:outline-none focus:border-ochre focus:ring-1 focus:ring-ochre"
                             />
                           </div>
 
@@ -452,7 +452,7 @@ export default function OrderPage() {
                               value={tableNumber}
                               onChange={(e) => setTableNumber(e.target.value)}
                               placeholder="e.g. Table 4"
-                              className="w-full bg-sand/40 border border-charcoal/10 rounded-xl px-4 py-2.5 text-sm text-charcoal focus:outline-none focus:border-ochre focus:ring-1 focus:ring-ochre"
+                              className="w-full bg-sand/40 border border-charcoal/10 rounded-xl px-4 py-3 text-sm text-charcoal focus:outline-none focus:border-ochre focus:ring-1 focus:ring-ochre"
                             />
                           </div>
 
@@ -465,7 +465,7 @@ export default function OrderPage() {
                           <button
                             type="submit"
                             disabled={submitting}
-                            className={`w-full text-center py-3.5 rounded-full font-medium tracking-wide text-cream transition-colors text-sm shadow-sm ${
+                            className={`w-full text-center py-3.5 md:py-3.5 rounded-full font-medium tracking-wide text-cream transition-colors text-xs md:text-sm shadow-sm ${
                               submitting
                                 ? "bg-tide/50 cursor-not-allowed"
                                 : "bg-ochre hover:bg-ochre/90"

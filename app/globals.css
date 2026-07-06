@@ -41,3 +41,12 @@ body {
 .font-body {
   font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 }
+
+/* Hide scrollbar for horizontal scrolling elements */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
