@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase, MenuCategory, MenuItem } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -39,7 +38,12 @@ export default function OrderPage() {
   // Order status
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const router = useRouter();
+  const [confirmation, setConfirmation] = useState<{
+    items: Array<{ item: MenuItem; qty: number }>;
+    total: number;
+    tableNumber: string;
+    customerName: string;
+  } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -144,11 +148,15 @@ export default function OrderPage() {
 
       if (itemsErr) throw itemsErr;
 
-      // Reset and redirect to live order status
       setCart({});
       setCustomerName("");
       setTableNumber("");
-      router.push(`/order/${orderId}`);
+      setConfirmation({
+        items: cartItems,
+        total: totalAmount,
+        tableNumber: tableNumber.trim(),
+        customerName: customerName.trim(),
+      });
     } catch (err: any) {
       console.error("Order error:", err);
       setErrorMessage(
@@ -164,6 +172,77 @@ export default function OrderPage() {
   const visibleCategories = categories.filter((cat) => items.some((item) => item.category_id === cat.id));
   const activeTabs = visibleCategories.length > 0 ? visibleCategories : [{ id: activeCategory, name: activeCategory, display_order: 0 }];
   const visibleItems = items.filter((i) => i.category_id === activeCategory);
+
+  if (confirmation) {
+    return (
+      <>
+        <Navbar />
+        <main className="min-h-screen bg-sand pt-28 pb-16">
+          <div className="max-w-5xl mx-auto px-5 md:px-8">
+            <section className="bg-cream border border-tide/10 rounded-[2rem] p-8 md:p-10 shadow-sm">
+              <div className="text-center">
+                <div className="mx-auto mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-tide/10 text-tide">
+                  <CheckCircle size={32} />
+                </div>
+                <h1 className="font-display text-4xl text-tide">Thank you for your order!</h1>
+                <p className="mt-4 text-charcoal/75 text-base md:text-lg">
+                  Your order has been sent to the kitchen. Enjoy your meal!
+                </p>
+              </div>
+
+              <div className="mt-10 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+                <div className="rounded-[2rem] bg-sand border border-tide/10 p-6">
+                  <h2 className="text-xl font-semibold text-tide">Order Summary</h2>
+                  <div className="mt-5 space-y-4">
+                    {confirmation.items.map(({ item, qty }) => (
+                      <div key={item.id} className="flex justify-between gap-4 text-sm">
+                        <p className="font-semibold text-charcoal">{qty}x {item.name}</p>
+                        <p className="font-semibold text-ochre">${(item.price * qty).toFixed(2)}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 border-t border-charcoal/10 pt-5 flex items-center justify-between text-base font-semibold text-charcoal">
+                    <span>Total</span>
+                    <span>${confirmation.total.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-4 text-sm text-charcoal/75">
+                    <p>
+                      <span className="font-semibold">Table:</span> {confirmation.tableNumber}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-[2rem] bg-tide text-cream p-6 flex flex-col justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">Order Details</h2>
+                    <div className="mt-5 space-y-4 text-sm text-cream/95">
+                      <div>
+                        <p className="text-xxs uppercase tracking-[0.25em] text-cream/70">Customer</p>
+                        <p className="mt-2 font-semibold">{confirmation.customerName}</p>
+                      </div>
+                      <div>
+                        <p className="text-xxs uppercase tracking-[0.25em] text-cream/70">Table</p>
+                        <p className="mt-2 font-semibold">{confirmation.tableNumber}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setConfirmation(null)}
+                    className="mt-8 w-full rounded-full bg-cream text-tide font-semibold py-3 transition hover:bg-cream/90"
+                  >
+                    Place another order
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+        <Footer />
+      </>
+    );
+  }
 
   return (
     <>
