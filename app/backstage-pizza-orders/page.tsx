@@ -1,14 +1,18 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Lock, LogOut, Bell, Sparkles, RefreshCw, ChevronDown, ChevronUp, Check, Play, CheckCircle } from "lucide-react";
+import { Lock, LogOut, Bell, Sparkles, RefreshCw, CheckCircle } from "lucide-react";
 
 type OrderItemRelation = {
   id: string;
+  menu_item_id: string | null;
   item_name: string;
   price: number;
   quantity: number;
+  menu_item?: {
+    image_url: string | null;
+  };
 };
 
 type OrderWithItems = {
@@ -18,7 +22,6 @@ type OrderWithItems = {
   status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
   total_amount: number;
   created_at: string;
-  estimated_ready_at?: string | null;
   order_items: OrderItemRelation[];
 };
 
@@ -26,27 +29,18 @@ export default function BackstageOrdersPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState("");
-  
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState(false);
-  const [showCompleted, setShowCompleted] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [prepOrderId, setPrepOrderId] = useState<string | null>(null);
-  const [prepMinutes, setPrepMinutes] = useState(15);
-  const [now, setNow] = useState<Date>(() => new Date());
 
-  // Check sessionStorage on load
   useEffect(() => {
     if (typeof window !== "undefined") {
       const isUnlocked = sessionStorage.getItem("admin_unlocked") === "true";
-      if (isUnlocked) {
-        setUnlocked(true);
-      }
+      if (isUnlocked) setUnlocked(true);
     }
   }, []);
 
-  // Fetch orders and their items
   const fetchOrders = async () => {
     try {
       const { data, error } = await supabase
@@ -58,12 +52,13 @@ export default function BackstageOrdersPage() {
           status,
           total_amount,
           created_at,
-          estimated_ready_at,
           order_items (
             id,
+            menu_item_id,
             item_name,
             price,
-            quantity
+            quantity,
+            menu_item (image_url)
           )
         `)
         .order("created_at", { ascending: false });
@@ -78,12 +73,9 @@ export default function BackstageOrdersPage() {
   };
 
   useEffect(() => {
-    if (unlocked) {
-      fetchOrders();
-    }
+    if (unlocked) fetchOrders();
   }, [unlocked]);
 
-  // Realtime subscription
   useEffect(() => {
     if (!unlocked) return;
 
@@ -94,9 +86,8 @@ export default function BackstageOrdersPage() {
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
-        
         osc.type = "sine";
-        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
         gain.gain.setValueAtTime(0, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
@@ -108,7 +99,7 @@ export default function BackstageOrdersPage() {
         osc2.connect(gain2);
         gain2.connect(ctx.destination);
         osc2.type = "sine";
-        osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
+        osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
         gain2.gain.setValueAtTime(0, ctx.currentTime + 0.15);
         gain2.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.2);
         gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
@@ -125,11 +116,7 @@ export default function BackstageOrdersPage() {
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
         (payload) => {
-          // Add a minor delay before fetching to guarantee line items exist
-          setTimeout(() => {
-            fetchOrders();
-          }, 350);
-
+          setTimeout(() => fetchOrders(), 350);
           if (payload.eventType === "INSERT") {
             setFlash(true);
             playNotificationSound();
@@ -140,26 +127,22 @@ export default function BackstageOrdersPage() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [unlocked]);
 
-  // Handle PIN entry
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError("");
-
     try {
       const res = await fetch("/api/verify-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin }),
       });
-
       if (res.ok) {
         sessionStorage.setItem("admin_unlocked", "true");
         setUnlocked(true);
-        setPinError("");
       } else {
         setPinError("Incorrect PIN. Access denied.");
       }
@@ -172,67 +155,35 @@ export default function BackstageOrdersPage() {
     sessionStorage.removeItem("admin_unlocked");
     setUnlocked(false);
     setPin("");
-    setPrepOrderId(null);
-    setPrepMinutes(15);
   };
 
-  const handleStartPreparing = async (orderId: string) => {
+  const handleMarkCompleted = async (orderId: string) => {
     setUpdatingId(orderId);
     try {
-      const estimatedReadyAt = new Date(Date.now() + prepMinutes * 60000).toISOString();
       const { error } = await supabase
         .from("orders")
-        .update({ status: "preparing", estimated_ready_at: estimatedReadyAt })
+        .update({ status: "completed" })
         .eq("id", orderId);
-
       if (error) throw error;
-      setPrepOrderId(null);
-      await fetchOrders();
+      fetchOrders();
     } catch (err) {
-      console.error("Error starting preparing:", err);
+      console.error("Error marking order completed:", err);
     } finally {
       setUpdatingId(null);
     }
   };
 
-  // Status progression action
-  const handleStatusUpdate = async (orderId: string, nextStatus: string) => {
-    setUpdatingId(orderId);
-    try {
-      const { error } = await supabase
-        .from("orders")
-        .update({ status: nextStatus })
-        .eq("id", orderId);
-
-      if (error) throw error;
-      await fetchOrders();
-    } catch (err) {
-      console.error("Error updating order status:", err);
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  useEffect(() => {
-    const interval = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Helper: format relative time
   const getRelativeTime = (isoString: string) => {
     const orderTime = new Date(isoString).getTime();
     const now = new Date().getTime();
     const diffMin = Math.round((now - orderTime) / 60000);
-    
     if (diffMin < 1) return "just now";
     if (diffMin === 1) return "1 min ago";
     return `${diffMin} mins ago`;
   };
 
-  // Stats calculation
-  const newOrdersCount = orders.filter((o) => o.status === "pending").length;
-  const inProgressCount = orders.filter((o) => o.status === "preparing" || o.status === "ready").length;
-
+  const pendingOrders = orders.filter((o) => o.status === "pending");
+  const newOrdersCount = pendingOrders.length;
   const todayRevenue = orders
     .filter((o) => {
       if (o.status === "cancelled") return false;
@@ -241,23 +192,6 @@ export default function BackstageOrdersPage() {
       return orderDate === todayDate;
     })
     .reduce((sum, o) => sum + Number(o.total_amount), 0);
-
-  // Grouping orders
-  const pendingOrders = orders.filter((o) => o.status === "pending");
-  const preparingOrders = orders.filter((o) => o.status === "preparing");
-  const readyOrders = orders.filter((o) => o.status === "ready");
-  const completedOrders = orders.filter((o) => o.status === "completed" || o.status === "cancelled");
-
-  const getCountdown = (estimatedReadyAt?: string | null) => {
-    if (!estimatedReadyAt) return "No ETA";
-    const diff = new Date(estimatedReadyAt).getTime() - now.getTime();
-    if (diff <= 0) return "Due now";
-    const mins = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000)
-      .toString()
-      .padStart(2, "0");
-    return `${mins}m ${seconds}s`;
-  };
 
   if (!unlocked) {
     return (
@@ -270,7 +204,6 @@ export default function BackstageOrdersPage() {
             <h1 className="text-xl font-bold text-slate-800">Backstage Orders Access</h1>
             <p className="text-sm text-slate-500 mt-1">Please enter the security PIN to proceed</p>
           </div>
-
           <form onSubmit={handlePinSubmit} className="space-y-4">
             <div>
               <input
@@ -283,13 +216,11 @@ export default function BackstageOrdersPage() {
                 className="w-full text-center tracking-widest text-lg font-bold bg-slate-50 border border-slate-200 rounded-xl py-3 text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
               />
             </div>
-
             {pinError && (
               <div className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-lg p-3 text-center font-medium">
                 {pinError}
               </div>
             )}
-
             <button
               type="submit"
               className="w-full bg-slate-900 text-white font-medium py-3 rounded-xl hover:bg-slate-850 transition-colors shadow-sm text-sm"
@@ -304,17 +235,13 @@ export default function BackstageOrdersPage() {
 
   return (
     <div className={`min-h-screen bg-[#f8fafc] p-4 md:p-8 font-sans transition-all duration-500 ${flash ? "bg-amber-50" : ""}`}>
-      {/* Alert Banner for New Orders */}
       {flash && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-white font-semibold px-6 py-3 rounded-full flex items-center gap-2 shadow-lg animate-bounce">
           <Bell size={18} className="animate-swing" />
           <span>NEW ORDER RECEIVED!</span>
         </div>
       )}
-
-      {/* Main Container */}
       <div className="max-w-7xl mx-auto">
-        {/* Top Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 flex items-center gap-2">
@@ -322,7 +249,6 @@ export default function BackstageOrdersPage() {
             </h1>
             <p className="text-slate-500 text-sm mt-0.5">Real-time order coordination & kitchen tracking</p>
           </div>
-
           <div className="flex items-center gap-3">
             <button
               onClick={fetchOrders}
@@ -340,8 +266,7 @@ export default function BackstageOrdersPage() {
           </div>
         </div>
 
-        {/* Summary Dashboard Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">New Orders</div>
             <div className="text-3xl font-bold text-amber-600 mt-2 flex items-baseline gap-2">
@@ -350,299 +275,67 @@ export default function BackstageOrdersPage() {
             </div>
           </div>
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">In Progress</div>
-            <div className="text-3xl font-bold text-blue-600 mt-2">{inProgressCount}</div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Today's Revenue</div>
             <div className="text-3xl font-bold text-emerald-600 mt-2">${todayRevenue.toFixed(2)}</div>
           </div>
         </div>
 
-        {/* Order Board Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* New Orders Column */}
-          <div className="bg-slate-100 border border-slate-200 rounded-2xl p-4 flex flex-col min-h-[400px]">
-            <h2 className="text-sm font-bold text-amber-750 uppercase tracking-wide mb-4 px-1 flex items-center justify-between">
-              <span>New / Pending</span>
-              <span className="bg-amber-250 text-amber-800 text-xs px-2 py-0.5 rounded-full">{pendingOrders.length}</span>
-            </h2>
-            <div className="space-y-4 overflow-y-auto flex-1">
-              {pendingOrders.map((order) => (
-                <div key={order.id} className="bg-white border border-slate-200 hover:border-amber-300 rounded-xl p-5 shadow-sm transition-all">
-                  <div className="flex justify-between items-start gap-2 mb-3">
-                    <div>
-                      <div className="font-bold text-slate-900 text-base">{order.table_number}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{order.customer_name}</div>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded">
-                      {getRelativeTime(order.created_at)}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-3 pb-3">
-                    <ul className="space-y-1.5">
-                      {order.order_items.map((item) => (
-                        <li key={item.id} className="text-xs text-slate-700 flex justify-between">
-                          <span>
-                            <strong className="text-slate-900 font-semibold">{item.quantity}x</strong> {item.item_name}
-                          </span>
-                          <span className="text-slate-400">${(item.price * item.quantity).toFixed(2)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-3 flex flex-col gap-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="text-sm font-bold text-slate-800">${Number(order.total_amount).toFixed(2)}</div>
-                      <button
-                        onClick={() => {
-                          setPrepOrderId(order.id);
-                          setPrepMinutes(15);
-                        }}
-                        disabled={updatingId === order.id}
-                        className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                      >
-                        <Play size={12} /> Start Preparing
-                      </button>
-                    </div>
-
-                    {prepOrderId === order.id && (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                        <div className="text-xs uppercase tracking-[0.2em] text-amber-700 font-semibold mb-3">
-                          Estimated ready in
-                        </div>
-                        <div className="flex flex-wrap gap-2 mb-4">
-                          {[10, 15, 20, 25].map((minutes) => (
-                            <button
-                              key={minutes}
-                              type="button"
-                              onClick={() => setPrepMinutes(minutes)}
-                              className={`px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
-                                prepMinutes === minutes
-                                  ? "bg-amber-600 text-white"
-                                  : "bg-white text-amber-700 border border-amber-200 hover:bg-amber-100"
-                              }`}
-                            >
-                              {minutes} min
-                            </button>
-                          ))}
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                          <button
-                            onClick={() => handleStartPreparing(order.id)}
-                            disabled={updatingId === order.id}
-                            className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2 rounded-full transition-colors disabled:opacity-50"
-                          >
-                            Confirm {prepMinutes} min
-                          </button>
-                          <button
-                            onClick={() => setPrepOrderId(null)}
-                            type="button"
-                            className="bg-white border border-amber-200 text-amber-700 text-xs font-semibold px-4 py-2 rounded-full hover:bg-amber-100 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {pendingOrders.length === 0 && (
-                <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-xl border border-dashed border-slate-200">
-                  No pending orders.
-                </div>
-              )}
+        <section className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+          <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Orders</h2>
+              <p className="text-sm text-slate-500 mt-1">Pending orders are listed below in the order they were received.</p>
             </div>
+            <span className="text-xs uppercase tracking-[0.3em] text-slate-400 font-semibold">{pendingOrders.length} pending</span>
           </div>
 
-          {/* Preparing Orders Column */}
-          <div className="bg-slate-100 border border-slate-200 rounded-2xl p-4 flex flex-col min-h-[400px]">
-            <h2 className="text-sm font-bold text-blue-750 uppercase tracking-wide mb-4 px-1 flex items-center justify-between">
-              <span>Preparing</span>
-              <span className="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full">{preparingOrders.length}</span>
-            </h2>
-            <div className="space-y-4 overflow-y-auto flex-1">
-              {preparingOrders.map((order) => {
-                const countdownLabel = order.estimated_ready_at ? getCountdown(order.estimated_ready_at) : "No ETA";
-                const isDue = order.estimated_ready_at
-                  ? new Date(order.estimated_ready_at).getTime() - now.getTime() <= 0
-                  : false;
+          <div className="space-y-4">
+            {pendingOrders.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-slate-400">
+                No pending orders at the moment.
+              </div>
+            ) : (
+              pendingOrders.map((order) => {
+                const firstItem = order.order_items[0];
+                const imageUrl = firstItem?.menu_item?.image_url || "";
+                const orderLabel = order.order_items.length > 1 ? `${firstItem?.item_name} + ${order.order_items.length - 1} more` : firstItem?.item_name;
                 return (
-                  <div key={order.id} className={`rounded-xl p-5 shadow-sm transition-all border ${isDue ? "border-rose-300 bg-rose-50 animate-pulse" : "border-slate-200 hover:border-blue-300 bg-white"}`}>
-                    <div className="flex justify-between items-start gap-2 mb-3">
-                      <div>
-                        <div className="font-bold text-slate-900 text-base">{order.table_number}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{order.customer_name}</div>
+                  <div key={order.id} className="flex flex-col md:flex-row gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm md:items-center">
+                    <div className="h-32 w-full md:w-36 rounded-3xl overflow-hidden bg-slate-100">
+                      <img src={imageUrl} alt={orderLabel || "Order image"} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm uppercase tracking-[0.32em] text-slate-400 font-semibold">{orderLabel}</p>
+                          <h3 className="text-lg font-semibold text-slate-900 mt-2">{order.customer_name}</h3>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500 uppercase tracking-[0.25em]">{order.table_number}</p>
+                          <p className="text-xs text-slate-500 mt-1">{getRelativeTime(order.created_at)}</p>
+                        </div>
                       </div>
-                      <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded">
-                        {getRelativeTime(order.created_at)}
-                      </span>
-                    </div>
 
-                    <div className="border-t border-slate-100 pt-3 pb-3">
-                      <ul className="space-y-1.5">
-                        {order.order_items.map((item) => (
-                          <li key={item.id} className="text-xs text-slate-700 flex justify-between">
-                            <span>
-                              <strong className="text-slate-900 font-semibold">{item.quantity}x</strong> {item.item_name}
-                            </span>
-                            <span className="text-slate-400">${(item.price * item.quantity).toFixed(2)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="mt-4 rounded-2xl bg-slate-50 border border-slate-100 p-3 text-sm text-slate-700">
-                      <div className="font-semibold text-slate-900">Prep timer</div>
-                      <div className="mt-2 flex items-center justify-between gap-4">
-                        <span>{countdownLabel}</span>
-                        {isDue ? (
-                          <span className="text-rose-700 text-xs font-semibold uppercase tracking-[0.18em]">
-                            Ready now
-                          </span>
-                        ) : (
-                          <span className="text-slate-500 text-xs uppercase tracking-[0.18em]">
-                            Preparing
-                          </span>
-                        )}
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 text-sm text-slate-600">
+                        <div className="rounded-2xl bg-white border border-slate-200 p-3">
+                          <span className="block text-xs text-slate-400">Total</span>
+                          <span className="font-semibold text-slate-900">${Number(order.total_amount).toFixed(2)}</span>
+                        </div>
+                        <button
+                          onClick={() => handleMarkCompleted(order.id)}
+                          disabled={updatingId === order.id}
+                          className="rounded-2xl bg-emerald-600 text-white px-4 py-3 text-sm font-semibold transition hover:bg-emerald-700 disabled:opacity-50"
+                        >
+                          <CheckCircle size={16} className="inline-block mr-2" /> Mark Completed
+                        </button>
                       </div>
-                    </div>
-
-                    <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-4">
-                      <div className="text-sm font-bold text-slate-800">${Number(order.total_amount).toFixed(2)}</div>
-                      <button
-                        onClick={() => handleStatusUpdate(order.id, "ready")}
-                        disabled={updatingId === order.id}
-                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                      >
-                        <Check size={12} /> Mark Ready
-                      </button>
                     </div>
                   </div>
                 );
-              })}
-              {preparingOrders.length === 0 && (
-                <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-xl border border-dashed border-slate-200">
-                  No orders preparing.
-                </div>
-              )}
-            </div>
+              })
+            )}
           </div>
-
-          {/* Ready Orders Column */}
-          <div className="bg-slate-100 border border-slate-200 rounded-2xl p-4 flex flex-col min-h-[400px]">
-            <h2 className="text-sm font-bold text-emerald-750 uppercase tracking-wide mb-4 px-1 flex items-center justify-between">
-              <span>Ready for Table</span>
-              <span className="bg-emerald-200 text-emerald-800 text-xs px-2 py-0.5 rounded-full">{readyOrders.length}</span>
-            </h2>
-            <div className="space-y-4 overflow-y-auto flex-1">
-              {readyOrders.map((order) => (
-                <div key={order.id} className="bg-white border border-slate-200 hover:border-emerald-300 rounded-xl p-5 shadow-sm transition-all">
-                  <div className="flex justify-between items-start gap-2 mb-3">
-                    <div>
-                      <div className="font-bold text-slate-900 text-base">{order.table_number}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{order.customer_name}</div>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded">
-                      {getRelativeTime(order.created_at)}
-                    </span>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-3 pb-3">
-                    <ul className="space-y-1.5">
-                      {order.order_items.map((item) => (
-                        <li key={item.id} className="text-xs text-slate-700 flex justify-between">
-                          <span>
-                            <strong className="text-slate-900 font-semibold">{item.quantity}x</strong> {item.item_name}
-                          </span>
-                          <span className="text-slate-400">${(item.price * item.quantity).toFixed(2)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-4">
-                    <div className="text-sm font-bold text-slate-800">${Number(order.total_amount).toFixed(2)}</div>
-                    <button
-                      onClick={() => handleStatusUpdate(order.id, "completed")}
-                      disabled={updatingId === order.id}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                    >
-                      <CheckCircle size={12} /> Serve & Complete
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {readyOrders.length === 0 && (
-                <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-xl border border-dashed border-slate-200">
-                  No orders ready to serve.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Collapsible Completed Orders Section */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-12">
-          <button
-            onClick={() => setShowCompleted(!showCompleted)}
-            className="w-full flex justify-between items-center px-6 py-5 hover:bg-slate-50 transition-colors text-slate-700 font-bold text-sm uppercase tracking-wide border-none"
-          >
-            <span className="flex items-center gap-2">
-              Completed / Cancelled Orders
-              <span className="bg-slate-100 text-slate-550 text-xs px-2 py-0.5 rounded-full font-medium normal-case">
-                {completedOrders.length} records
-              </span>
-            </span>
-            {showCompleted ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-          </button>
-
-          {showCompleted && (
-            <div className="border-t border-slate-150 p-6 bg-slate-50">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {completedOrders.map((order) => (
-                  <div key={order.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-                    <div className="flex justify-between items-start gap-2 mb-3">
-                      <div>
-                        <div className="font-bold text-slate-700">{order.table_number}</div>
-                        <div className="text-xs text-slate-400">{order.customer_name}</div>
-                      </div>
-                      <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                        order.status === "completed" ? "bg-slate-100 text-slate-600" : "bg-rose-50 text-rose-600"
-                      }`}>
-                        {order.status}
-                      </span>
-                    </div>
-
-                    <div className="border-t border-slate-100 pt-3 pb-3">
-                      <ul className="space-y-1">
-                        {order.order_items.map((item) => (
-                          <li key={item.id} className="text-xs text-slate-500">
-                            <strong>{item.quantity}x</strong> {item.item_name}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="border-t border-slate-100 pt-3 flex justify-between text-xs text-slate-500 font-medium">
-                      <span>Total: ${Number(order.total_amount).toFixed(2)}</span>
-                      <span>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                  </div>
-                ))}
-                {completedOrders.length === 0 && (
-                  <div className="text-center py-6 text-slate-400 text-sm col-span-full">
-                    No completed or cancelled orders today.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
+        </section>
       </div>
     </div>
   );
