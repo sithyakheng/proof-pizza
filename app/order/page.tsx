@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase, MenuCategory, MenuItem } from "@/lib/supabase";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -37,8 +38,8 @@ export default function OrderPage() {
   
   // Order status
   const [submitting, setSubmitting] = useState(false);
-  const [orderPlaced, setOrderPlaced] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     async function load() {
@@ -143,11 +144,11 @@ export default function OrderPage() {
 
       if (itemsErr) throw itemsErr;
 
-      // Reset and complete
+      // Reset and redirect to live order status
       setCart({});
       setCustomerName("");
       setTableNumber("");
-      setOrderPlaced(true);
+      router.push(`/order/${orderId}`);
     } catch (err: any) {
       console.error("Order error:", err);
       setErrorMessage(
@@ -169,24 +170,7 @@ export default function OrderPage() {
       <Navbar />
       <main className="min-h-screen bg-sand pt-28 pb-16">
         <div className="max-w-6xl mx-auto px-5 md:px-8">
-          {orderPlaced ? (
-            <div className="max-w-xl mx-auto mt-12 bg-cream border border-tide/10 rounded-3xl p-8 md:p-12 text-center shadow-lg">
-              <div className="flex justify-center mb-6">
-                <CheckCircle className="text-ochre w-16 h-16" />
-              </div>
-              <h2 className="font-display text-3xl text-tide mb-4 font-semibold">Order Received!</h2>
-              <p className="text-charcoal/70 mb-8 leading-relaxed">
-                Thank you! The kitchen has received your order and we'll start preparing it right away.
-              </p>
-              <button
-                onClick={() => setOrderPlaced(false)}
-                className="bg-tide text-cream px-8 py-3 rounded-full font-medium tracking-wide hover:bg-tide-light transition-colors"
-              >
-                Order Something Else
-              </button>
-            </div>
-          ) : (
-            <>
+          <>
               {/* Header */}
               <div className="mb-10 text-center md:text-left">
                 <span className="text-ochre text-sm tracking-[0.2em] uppercase font-medium">

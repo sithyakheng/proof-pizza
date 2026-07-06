@@ -40,6 +40,7 @@ export type Order = {
   status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
   total_amount: number;
   created_at: string;
+  estimated_ready_at?: string | null;
 };
 
 export type OrderItem = {

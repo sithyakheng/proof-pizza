@@ -18,6 +18,7 @@ type OrderWithItems = {
   status: "pending" | "confirmed" | "preparing" | "ready" | "completed" | "cancelled";
   total_amount: number;
   created_at: string;
+  estimated_ready_at?: string | null;
   order_items: OrderItemRelation[];
 };
 
@@ -31,6 +32,12 @@ export default function BackstageOrdersPage() {
   const [flash, setFlash] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [prepOrderId, setPrepOrderId] = useState<string | null>(null);
+  const [prepMinutes, setPrepMinutes] = useState(15);
+  const [now, setNow] = useState<Date>(() => new Date());
+  const [prepOrderId, setPrepOrderId] = useState<string | null>(null);
+  const [prepMinutes, setPrepMinutes] = useState(15);
+  const [now, setNow] = useState<Date>(() => new Date());
 
   // Check sessionStorage on load
   useEffect(() => {
@@ -54,6 +61,7 @@ export default function BackstageOrdersPage() {
           status,
           total_amount,
           created_at,
+          estimated_ready_at,
           order_items (
             id,
             item_name,
@@ -167,6 +175,27 @@ export default function BackstageOrdersPage() {
     sessionStorage.removeItem("admin_unlocked");
     setUnlocked(false);
     setPin("");
+    setPrepOrderId(null);
+    setPrepMinutes(15);
+  };
+
+  const handleStartPreparing = async (orderId: string) => {
+    setUpdatingId(orderId);
+    try {
+      const estimatedReadyAt = new Date(Date.now() + prepMinutes * 60000).toISOString();
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: "preparing", estimated_ready_at: estimatedReadyAt })
+        .eq("id", orderId);
+
+      if (error) throw error;
+      setPrepOrderId(null);
+      await fetchOrders();
+    } catch (err) {
+      console.error("Error starting preparing:", err);
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   // Status progression action
@@ -186,6 +215,11 @@ export default function BackstageOrdersPage() {
       setUpdatingId(null);
     }
   };
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Helper: format relative time
   const getRelativeTime = (isoString: string) => {
@@ -216,6 +250,17 @@ export default function BackstageOrdersPage() {
   const preparingOrders = orders.filter((o) => o.status === "preparing");
   const readyOrders = orders.filter((o) => o.status === "ready");
   const completedOrders = orders.filter((o) => o.status === "completed" || o.status === "cancelled");
+
+  const getCountdown = (estimatedReadyAt?: string | null) => {
+    if (!estimatedReadyAt) return "No ETA";
+    const diff = new Date(estimatedReadyAt).getTime() - now.getTime();
+    if (diff <= 0) return "Due now";
+    const mins = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000)
+      .toString()
+      .padStart(2, "0");
+    return `${mins}m ${seconds}s`;
+  };
 
   if (!unlocked) {
     return (
@@ -351,15 +396,60 @@ export default function BackstageOrdersPage() {
                     </ul>
                   </div>
 
-                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-4">
-                    <div className="text-sm font-bold text-slate-800">${Number(order.total_amount).toFixed(2)}</div>
-                    <button
-                      onClick={() => handleStatusUpdate(order.id, "preparing")}
-                      disabled={updatingId === order.id}
-                      className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                    >
-                      <Play size={12} /> Start Preparing
-                    </button>
+                  <div className="border-t border-slate-100 pt-3 flex flex-col gap-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-sm font-bold text-slate-800">${Number(order.total_amount).toFixed(2)}</div>
+                      <button
+                        onClick={() => {
+                          setPrepOrderId(order.id);
+                          setPrepMinutes(15);
+                        }}
+                        disabled={updatingId === order.id}
+                        className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        <Play size={12} /> Start Preparing
+                      </button>
+                    </div>
+
+                    {prepOrderId === order.id && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                        <div className="text-xs uppercase tracking-[0.2em] text-amber-700 font-semibold mb-3">
+                          Estimated ready in
+                        </div>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {[10, 15, 20, 25].map((minutes) => (
+                            <button
+                              key={minutes}
+                              type="button"
+                              onClick={() => setPrepMinutes(minutes)}
+                              className={`px-3 py-2 rounded-full text-xs font-semibold transition-colors ${
+                                prepMinutes === minutes
+                                  ? "bg-amber-600 text-white"
+                                  : "bg-white text-amber-700 border border-amber-200 hover:bg-amber-100"
+                              }`}
+                            >
+                              {minutes} min
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => handleStartPreparing(order.id)}
+                            disabled={updatingId === order.id}
+                            className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2 rounded-full transition-colors disabled:opacity-50"
+                          >
+                            Confirm {prepMinutes} min
+                          </button>
+                          <button
+                            onClick={() => setPrepOrderId(null)}
+                            type="button"
+                            className="bg-white border border-amber-200 text-amber-700 text-xs font-semibold px-4 py-2 rounded-full hover:bg-amber-100 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -378,43 +468,65 @@ export default function BackstageOrdersPage() {
               <span className="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full">{preparingOrders.length}</span>
             </h2>
             <div className="space-y-4 overflow-y-auto flex-1">
-              {preparingOrders.map((order) => (
-                <div key={order.id} className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-5 shadow-sm transition-all">
-                  <div className="flex justify-between items-start gap-2 mb-3">
-                    <div>
-                      <div className="font-bold text-slate-900 text-base">{order.table_number}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{order.customer_name}</div>
+              {preparingOrders.map((order) => {
+                const countdownLabel = order.estimated_ready_at ? getCountdown(order.estimated_ready_at) : "No ETA";
+                const isDue = order.estimated_ready_at
+                  ? new Date(order.estimated_ready_at).getTime() - now.getTime() <= 0
+                  : false;
+                return (
+                  <div key={order.id} className={`rounded-xl p-5 shadow-sm transition-all border ${isDue ? "border-rose-300 bg-rose-50 animate-pulse" : "border-slate-200 hover:border-blue-300 bg-white"}`}>
+                    <div className="flex justify-between items-start gap-2 mb-3">
+                      <div>
+                        <div className="font-bold text-slate-900 text-base">{order.table_number}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{order.customer_name}</div>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded">
+                        {getRelativeTime(order.created_at)}
+                      </span>
                     </div>
-                    <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap bg-slate-50 px-2 py-1 rounded">
-                      {getRelativeTime(order.created_at)}
-                    </span>
-                  </div>
 
-                  <div className="border-t border-slate-100 pt-3 pb-3">
-                    <ul className="space-y-1.5">
-                      {order.order_items.map((item) => (
-                        <li key={item.id} className="text-xs text-slate-700 flex justify-between">
-                          <span>
-                            <strong className="text-slate-900 font-semibold">{item.quantity}x</strong> {item.item_name}
+                    <div className="border-t border-slate-100 pt-3 pb-3">
+                      <ul className="space-y-1.5">
+                        {order.order_items.map((item) => (
+                          <li key={item.id} className="text-xs text-slate-700 flex justify-between">
+                            <span>
+                              <strong className="text-slate-900 font-semibold">{item.quantity}x</strong> {item.item_name}
+                            </span>
+                            <span className="text-slate-400">${(item.price * item.quantity).toFixed(2)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="mt-4 rounded-2xl bg-slate-50 border border-slate-100 p-3 text-sm text-slate-700">
+                      <div className="font-semibold text-slate-900">Prep timer</div>
+                      <div className="mt-2 flex items-center justify-between gap-4">
+                        <span>{countdownLabel}</span>
+                        {isDue ? (
+                          <span className="text-rose-700 text-xs font-semibold uppercase tracking-[0.18em]">
+                            Ready now
                           </span>
-                          <span className="text-slate-400">${(item.price * item.quantity).toFixed(2)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                        ) : (
+                          <span className="text-slate-500 text-xs uppercase tracking-[0.18em]">
+                            Preparing
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-4">
-                    <div className="text-sm font-bold text-slate-800">${Number(order.total_amount).toFixed(2)}</div>
-                    <button
-                      onClick={() => handleStatusUpdate(order.id, "ready")}
-                      disabled={updatingId === order.id}
-                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                    >
-                      <Check size={12} /> Mark Ready
-                    </button>
+                    <div className="border-t border-slate-100 pt-3 flex items-center justify-between gap-4">
+                      <div className="text-sm font-bold text-slate-800">${Number(order.total_amount).toFixed(2)}</div>
+                      <button
+                        onClick={() => handleStatusUpdate(order.id, "ready")}
+                        disabled={updatingId === order.id}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      >
+                        <Check size={12} /> Mark Ready
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {preparingOrders.length === 0 && (
                 <div className="text-center py-12 text-slate-400 text-sm bg-white rounded-xl border border-dashed border-slate-200">
                   No orders preparing.
