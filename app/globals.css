@@ -10,7 +10,7 @@
   --color-clay: #a85a3f;
 }
 
-/* @theme is a Tailwind CSS v4 directive - linter warning can be ignored */
+/* stylelint-disable-next-line at-rule-no-unknown */
 @theme inline {
   --color-tide: var(--color-tide);
   --color-tide-light: var(--color-tide-light);
