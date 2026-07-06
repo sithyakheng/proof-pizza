@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Lock, LogOut, Bell, Sparkles, RefreshCw, CheckCircle } from "lucide-react";
 
@@ -10,7 +10,7 @@ type OrderItemRelation = {
   item_name: string;
   price: number;
   quantity: number;
-  menu_item?: {
+  menu_items?: {
     image_url: string | null;
   };
 };
@@ -33,6 +33,8 @@ export default function BackstageOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [flash, setFlash] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -41,7 +43,7 @@ export default function BackstageOrdersPage() {
     }
   }, []);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("orders")
@@ -58,24 +60,49 @@ export default function BackstageOrdersPage() {
             item_name,
             price,
             quantity,
-            menu_item (image_url)
+            menu_items (image_url)
           )
         `)
+        .eq("status", "pending")
         .order("created_at", { ascending: false });
 
       console.log("[backstage] orders query raw result:", { data, error });
       if (error) throw error;
       setOrders((data as any) || []);
+      setLastUpdatedAt(Date.now());
+      setNow(Date.now());
     } catch (err) {
       console.error("Error fetching backstage orders:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    if (unlocked) fetchOrders();
-  }, [unlocked]);
+    if (!unlocked) return;
+
+    fetchOrders();
+
+    const refreshIntervalId = window.setInterval(() => {
+      fetchOrders();
+    }, 20000);
+
+    return () => {
+      window.clearInterval(refreshIntervalId);
+    };
+  }, [unlocked, fetchOrders]);
+
+  useEffect(() => {
+    if (!unlocked || !lastUpdatedAt) return;
+
+    const clockIntervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(clockIntervalId);
+    };
+  }, [unlocked, lastUpdatedAt]);
 
   useEffect(() => {
     if (!unlocked) return;
@@ -130,7 +157,7 @@ export default function BackstageOrdersPage() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [unlocked]);
+  }, [unlocked, fetchOrders]);
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +210,17 @@ export default function BackstageOrdersPage() {
     return `${diffMin} mins ago`;
   };
 
-  const pendingOrders = orders.filter((o) => o.status === "pending");
+  const getLastUpdatedLabel = () => {
+    if (!lastUpdatedAt) return "Refreshing every 20s";
+
+    const diffSeconds = Math.max(0, Math.floor((now - lastUpdatedAt) / 1000));
+
+    if (diffSeconds < 1) return "Last updated just now";
+    if (diffSeconds === 1) return "Last updated 1 second ago";
+    return `Last updated ${diffSeconds} seconds ago`;
+  };
+
+  const pendingOrders = orders;
   const newOrdersCount = pendingOrders.length;
   const todayRevenue = orders
     .filter((o) => {
@@ -249,6 +286,7 @@ export default function BackstageOrdersPage() {
               Backstage Orders <Sparkles size={20} className="text-amber-500" />
             </h1>
             <p className="text-slate-500 text-sm mt-0.5">Real-time order coordination & kitchen tracking</p>
+            <p className="text-slate-400 text-xs mt-1">Auto-refresh every 20s · {getLastUpdatedLabel()}</p>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -298,7 +336,7 @@ export default function BackstageOrdersPage() {
             ) : (
               pendingOrders.map((order) => {
                 const firstItem = order.order_items[0];
-                const imageUrl = firstItem?.menu_item?.image_url || "";
+                const imageUrl = firstItem?.menu_items?.image_url || "";
                 const orderLabel = order.order_items.length > 1 ? `${firstItem?.item_name} + ${order.order_items.length - 1} more` : firstItem?.item_name;
                 return (
                   <div key={order.id} className="flex flex-col md:flex-row gap-4 rounded-3xl border border-slate-200 bg-slate-50 p-5 shadow-sm md:items-center">

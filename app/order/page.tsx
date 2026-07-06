@@ -126,9 +126,9 @@ export default function OrderPage() {
         .select()
         .single();
 
-      console.log("[order] insert orders result:", { orderData, orderErr });
       if (orderErr) throw orderErr;
 
+      console.log("[order] inserted order row:", orderData);
       const orderId = orderData.id;
       console.log("[order] created order id:", orderId);
 
