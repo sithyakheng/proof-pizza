@@ -35,9 +35,6 @@ export default function BackstageOrdersPage() {
   const [prepOrderId, setPrepOrderId] = useState<string | null>(null);
   const [prepMinutes, setPrepMinutes] = useState(15);
   const [now, setNow] = useState<Date>(() => new Date());
-  const [prepOrderId, setPrepOrderId] = useState<string | null>(null);
-  const [prepMinutes, setPrepMinutes] = useState(15);
-  const [now, setNow] = useState<Date>(() => new Date());
 
   // Check sessionStorage on load
   useEffect(() => {

@@ -170,7 +170,6 @@ export default function OrderPage() {
       <Navbar />
       <main className="min-h-screen bg-sand pt-28 pb-16">
         <div className="max-w-6xl mx-auto px-5 md:px-8">
-          <>
               {/* Header */}
               <div className="mb-10 text-center md:text-left">
                 <span className="text-ochre text-sm tracking-[0.2em] uppercase font-medium">
@@ -399,8 +398,6 @@ export default function OrderPage() {
                 </div>
 
               </div>
-            </>
-          )}
         </div>
       </main>
       <Footer />
