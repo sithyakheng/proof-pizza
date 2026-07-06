@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase, MenuCategory, MenuItem } from "@/lib/supabase";
+import { Pizza } from "lucide-react";
 
 const FALLBACK_CATEGORIES: MenuCategory[] = [
   { id: "c1", name: "Pizza", display_order: 1 },
@@ -16,7 +17,7 @@ const FALLBACK_ITEMS: MenuItem[] = [
     name: "Prosciutto & Arugula",
     description: "San Daniele prosciutto, fresh arugula, shaved parmesan",
     price: 8.5,
-    image_url: null,
+    image_url: "https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=600&auto=format&fit=crop&q=60",
     is_available: true,
     display_order: 1,
   },
@@ -26,7 +27,7 @@ const FALLBACK_ITEMS: MenuItem[] = [
     name: "Margherita",
     description: "San Marzano tomato, fior di latte, basil",
     price: 6.5,
-    image_url: null,
+    image_url: "https://images.unsplash.com/photo-1604068549290-dea0e4a305ca?w=600&auto=format&fit=crop&q=60",
     is_available: true,
     display_order: 2,
   },
@@ -36,7 +37,7 @@ const FALLBACK_ITEMS: MenuItem[] = [
     name: "Kep Pepper Prawn",
     description: "Local Kep prawns, Kampot pepper, garlic oil",
     price: 9,
-    image_url: null,
+    image_url: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&auto=format&fit=crop&q=60",
     is_available: true,
     display_order: 3,
   },
@@ -46,7 +47,7 @@ const FALLBACK_ITEMS: MenuItem[] = [
     name: "Garlic Focaccia",
     description: "Baked to order, herb butter",
     price: 3.5,
-    image_url: null,
+    image_url: "https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=600&auto=format&fit=crop&q=60",
     is_available: true,
     display_order: 1,
   },
@@ -56,7 +57,7 @@ const FALLBACK_ITEMS: MenuItem[] = [
     name: "Iced Pour-Over",
     description: "Rotating single origin",
     price: 3,
-    image_url: null,
+    image_url: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=600&auto=format&fit=crop&q=60",
     is_available: true,
     display_order: 1,
   },
@@ -66,7 +67,7 @@ const FALLBACK_ITEMS: MenuItem[] = [
     name: "Fresh Lime Soda",
     description: "Kep lime, soda, mint",
     price: 2.5,
-    image_url: null,
+    image_url: "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=60",
     is_available: true,
     display_order: 2,
   },
@@ -142,36 +143,58 @@ export default function Menu() {
         {loading ? (
           <div className="text-cream/50 text-sm">Loading menu…</div>
         ) : (
-          <div className="grid sm:grid-cols-2 gap-x-10 gap-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
             {visibleItems.map((item) => (
               <div
                 key={item.id}
-                className="flex justify-between gap-4 border-b border-cream/10 pb-6"
+                className="bg-cream/5 border border-cream/10 rounded-2xl overflow-hidden flex flex-col sm:flex-row gap-5 p-5"
               >
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-display text-lg text-cream">
-                      {item.name}
-                    </h3>
-                    {!item.is_available && (
-                      <span className="text-xs uppercase tracking-wide text-clay border border-clay/50 rounded-full px-2 py-0.5">
-                        Sold out
-                      </span>
-                    )}
-                  </div>
-                  {item.description && (
-                    <p className="text-cream/55 text-sm mt-1.5 leading-relaxed">
-                      {item.description}
-                    </p>
+                {/* Fixed aspect ratio photo frame */}
+                <div className="relative w-full sm:w-32 h-48 sm:h-32 shrink-0 rounded-xl overflow-hidden bg-cream/10 flex items-center justify-center">
+                  {item.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-cream/30 text-xs font-semibold select-none flex flex-col items-center gap-1.5">
+                      <Pizza size={24} className="opacity-40" />
+                      <span>No Photo</span>
+                    </div>
                   )}
                 </div>
-                <div className="font-display text-ochre text-lg whitespace-nowrap">
-                  ${item.price.toFixed(2)}
+
+                {/* Info and price */}
+                <div className="flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h3 className="font-display text-lg text-cream font-medium">
+                        {item.name}
+                      </h3>
+                      {!item.is_available && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-clay border border-clay/35 rounded-full px-2 py-0.5">
+                          Sold out
+                        </span>
+                      )}
+                    </div>
+                    {item.description && (
+                      <p className="text-cream/55 text-sm mt-1.5 leading-relaxed">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="font-display text-ochre text-lg mt-3 sm:mt-0">
+                    ${item.price.toFixed(2)}
+                  </div>
                 </div>
               </div>
             ))}
             {visibleItems.length === 0 && (
-              <p className="text-cream/50 text-sm">No items in this category yet.</p>
+              <p className="text-cream/50 text-sm col-span-2 text-center py-8">
+                No items in this category yet.
+              </p>
             )}
           </div>
         )}
