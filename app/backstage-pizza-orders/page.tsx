@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Lock, LogOut, Bell, Sparkles, RefreshCw, CheckCircle } from "lucide-react";
+import { Lock, LogOut, Bell, Sparkles, RefreshCw, CheckCircle, Trash2, AlertTriangle } from "lucide-react";
 
 type OrderItemRelation = {
   id: string;
@@ -35,6 +35,8 @@ export default function BackstageOrdersPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -185,6 +187,36 @@ export default function BackstageOrdersPage() {
     setPin("");
   };
 
+  const handleResetOrders = async () => {
+    setResetting(true);
+    try {
+      // Delete order_items first (foreign key constraint)
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all rows
+
+      if (itemsError) throw itemsError;
+
+      // Then delete orders
+      const { error: ordersError } = await supabase
+        .from("orders")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all rows
+
+      if (ordersError) throw ordersError;
+
+      // Refresh the dashboard
+      await fetchOrders();
+      setShowResetDialog(false);
+    } catch (err) {
+      console.error("Error resetting orders:", err);
+      alert("Failed to reset orders. Please try again.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const handleMarkCompleted = async (orderId: string) => {
     setUpdatingId(orderId);
     try {
@@ -279,6 +311,37 @@ export default function BackstageOrdersPage() {
           <span>NEW ORDER RECEIVED!</span>
         </div>
       )}
+      {showResetDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">Reset All Orders</h3>
+            </div>
+            <p className="text-slate-600 mb-6">
+              This will permanently delete all orders. Are you sure?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowResetDialog(false)}
+                disabled={resetting}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-medium hover:bg-slate-50 transition-colors disabled:opacity-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResetOrders}
+                disabled={resetting}
+                className="px-4 py-2.5 rounded-xl bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors disabled:opacity-50 text-sm flex items-center gap-2"
+              >
+                {resetting ? "Deleting..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -295,6 +358,12 @@ export default function BackstageOrdersPage() {
               title="Refresh Orders"
             >
               <RefreshCw size={18} />
+            </button>
+            <button
+              onClick={() => setShowResetDialog(true)}
+              className="bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 px-4 py-2.5 rounded-xl transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
+            >
+              <Trash2 size={16} /> Reset Orders
             </button>
             <button
               onClick={handleLogout}
