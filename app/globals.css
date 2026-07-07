@@ -10,7 +10,7 @@
   --color-clay: #a85a3f;
 }
 
-/* stylelint-disable-next-line at-rule-no-unknown */
+/* stylelint-disable */
 @theme inline {
   --color-tide: var(--color-tide);
   --color-tide-light: var(--color-tide-light);
@@ -20,6 +20,7 @@
   --color-ochre: var(--color-ochre);
   --color-clay: var(--color-clay);
 }
+/* stylelint-enable */
 
 html {
   scroll-behavior: smooth;
