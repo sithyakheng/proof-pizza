@@ -220,14 +220,25 @@ export default function BackstageOrdersPage() {
   const handleMarkCompleted = async (orderId: string) => {
     setUpdatingId(orderId);
     try {
-      const { error } = await supabase
+      console.log("[backstage] Marking order as completed:", orderId);
+      const { data, error } = await supabase
         .from("orders")
         .update({ status: "completed" })
-        .eq("id", orderId);
+        .eq("id", orderId)
+        .select();
+      
+      console.log("[backstage] Update result:", { data, error });
+      
       if (error) throw error;
+      
+      // Optimistic UI update: remove from local state immediately
+      setOrders((prevOrders) => prevOrders.filter((order) => order.id !== orderId));
+      
+      // Also refresh from server to ensure consistency
       fetchOrders();
     } catch (err) {
       console.error("Error marking order completed:", err);
+      alert("Failed to mark order as completed. Please try again.");
     } finally {
       setUpdatingId(null);
     }
